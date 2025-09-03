@@ -61,11 +61,15 @@ dependencies {
     debugImplementation(libs.androidx.ui.tooling)
     debugImplementation(libs.androidx.ui.test.manifest)
 
+    // ViewModel
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+
     // kotlinx.serialization
     implementation(libs.kotlinx.serialization.json)
 
     // supabase
     implementation(platform(libs.bom))
+    implementation(libs.ktor.client.okhttp)
     implementation(libs.postgrest.kt)
-    implementation(libs.ktor.client.android)
+    implementation(libs.realtime.kt)
 }
