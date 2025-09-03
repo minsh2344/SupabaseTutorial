@@ -1,15 +1,19 @@
 package com.example.supabasetutorial
 
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.background
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -19,17 +23,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Send
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,33 +43,23 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.supabasetutorial.ui.theme.SupabaseTutorialTheme
-import io.github.jan.supabase.createSupabaseClient
-import io.github.jan.supabase.postgrest.Postgrest
-import io.github.jan.supabase.postgrest.from
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-
-val supabase = createSupabaseClient(
-    supabaseUrl = "https://mdnkygiszaemqtmwrvzr.supabase.co",
-    supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1kbmt5Z2lzemFlbXF0bXdydnpyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTY3ODM3NTUsImV4cCI6MjA3MjM1OTc1NX0.Kca-JPnunsC3dsslGN5RTrXofl_1rO4AtoH6mP4Z1Fs"
-) {
-    install(Postgrest)
-}
+import java.time.OffsetDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
             SupabaseTutorialTheme {
-                ChatApp()
+                ChatScreen()
             }
         }
     }
@@ -71,30 +67,24 @@ class MainActivity : ComponentActivity() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ChatApp() {
+fun ChatScreen(viewModel: ChatViewModel = viewModel()) {
     var messageText by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
+    val messages by viewModel.messages.collectAsState()
+    val coroutineScope = rememberCoroutineScope()
 
-    var messages by remember { mutableStateOf<List<Message>>(listOf()) }
     LaunchedEffect(Unit) {
-        withContext(Dispatchers.IO) {
-            // 메시지 수신
-            messages = supabase.from("messages")
-                .select().decodeList<Message>()
-        }
+        viewModel.loadMessages()
+        viewModel.subscribeToMessages()
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFFF5F5F5))
+        modifier = Modifier.fillMaxSize()
     ) {
-        // 상단 앱바
+        // 헤더
         TopAppBar(
             title = {
                 Text(
-                    text = "채팅",
-                    fontSize = 20.sp,
+                    "Supabase Chat",
                     fontWeight = FontWeight.Bold
                 )
             },
@@ -108,9 +98,9 @@ fun ChatApp() {
         LazyColumn(
             modifier = Modifier
                 .weight(1f)
-                .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(horizontal = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(vertical = 8.dp)
         ) {
             items(messages) { message ->
                 MessageBubble(message = message)
@@ -118,105 +108,105 @@ fun ChatApp() {
         }
 
         // 메시지 입력 영역
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shadowElevation = 8.dp,
-            color = Color.White
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                OutlinedTextField(
-                    value = messageText,
-                    onValueChange = { messageText = it },
-                    modifier = Modifier
-                        .weight(1f)
-                        .padding(end = 12.dp),
-                    placeholder = { Text("메시지를 입력하세요...") },
-                    maxLines = 4,
-                    shape = RoundedCornerShape(24.dp)
-                )
+            OutlinedTextField(
+                value = messageText,
+                onValueChange = { messageText = it },
+                modifier = Modifier.weight(1f),
+                placeholder = { Text("메시지를 입력하세요...") },
+                shape = RoundedCornerShape(24.dp)
+            )
 
-                FloatingActionButton(
-                    onClick = {
-                        val text = messageText
-                        if (text.isNotEmpty()) {
-                            scope.launch {
-                                // 메시지 전송
-                                supabase.from("messages")
-                                    .insert(Message( text, true))
-                                // 메시지 수신
-                                messages = supabase.from("messages")
-                                    .select().decodeList<Message>()
-                            }
+            Spacer(modifier = Modifier.width(8.dp))
+
+            FloatingActionButton(
+                onClick = {
+                    if (messageText.isNotBlank()) {
+                        coroutineScope.launch {
+                            viewModel.sendMessage(messageText.trim())
                             messageText = ""
                         }
-                    },
-                    modifier = Modifier.size(56.dp),
-                    containerColor = MaterialTheme.colorScheme.primary
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "메시지 전송",
-                        tint = Color.White
-                    )
-                }
+                    }
+                },
+                modifier = Modifier.size(56.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Send,
+                    contentDescription = "Send"
+                )
             }
         }
     }
 }
 
+@RequiresApi(Build.VERSION_CODES.O)
 @Composable
-fun MessageBubble(message: Message) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = if (message.isFromUser) Arrangement.End else Arrangement.Start
-    ) {
-        if (!message.isFromUser) {
-            Spacer(modifier = Modifier.width(8.dp))
-        }
+fun MessageBubble(message: ChatMessage) {
+    val isCurrentUser = message.userId == "currentUserId"
 
-        Surface(
-            color = if (message.isFromUser)
-                MaterialTheme.colorScheme.primary
-            else
-                Color.White,
-            shape = RoundedCornerShape(
-                topStart = 20.dp,
-                topEnd = 20.dp,
-                bottomStart = if (message.isFromUser) 20.dp else 4.dp,
-                bottomEnd = if (message.isFromUser) 4.dp else 20.dp
-            ),
-            shadowElevation = 2.dp,
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = if (isCurrentUser) Alignment.CenterEnd else Alignment.CenterStart
+    ) {
+        Card(
             modifier = Modifier
                 .widthIn(max = 280.dp)
-                .clip(RoundedCornerShape(20.dp))
-        ) {
-            Text(
-                text = message.message,
-                modifier = Modifier.padding(
-                    horizontal = 16.dp,
-                    vertical = 12.dp
-                ),
-                color = if (message.isFromUser) Color.White else Color.Black,
-                fontSize = 16.sp,
-                lineHeight = 22.sp
+                .padding(vertical = 2.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isCurrentUser)
+                    MaterialTheme.colorScheme.primary
+                else
+                    MaterialTheme.colorScheme.surfaceVariant
+            ),
+            shape = RoundedCornerShape(
+                topStart = 16.dp,
+                topEnd = 16.dp,
+                bottomStart = if (isCurrentUser) 16.dp else 4.dp,
+                bottomEnd = if (isCurrentUser) 4.dp else 16.dp
             )
-        }
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp)
+            ) {
+                if (!isCurrentUser) {
+                    Text(
+                        text = message.username,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
 
-        if (message.isFromUser) {
-            Spacer(modifier = Modifier.width(8.dp))
+                Text(
+                    text = message.content,
+                    color = if (isCurrentUser) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 14.sp
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                Text(
+                    text = formatTime(message.createdAt),
+                    fontSize = 10.sp,
+                    color = if (isCurrentUser)
+                        Color.White.copy(alpha = 0.7f)
+                    else
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
         }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun ChatAppPreview() {
-    MaterialTheme {
-        ChatApp()
-    }
+@RequiresApi(Build.VERSION_CODES.O)
+fun formatTime(timestamp: String): String {
+    val odt = OffsetDateTime.parse(timestamp.replace(" ", "T"))
+    val formatter = DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault())
+    return odt.format(formatter)
 }

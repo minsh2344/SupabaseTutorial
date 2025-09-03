@@ -4,8 +4,9 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 @Serializable
-data class Message(
-    val message: String,
-    @SerialName("is_from_user")
-    val isFromUser: Boolean
+data class ChatMessageInsert(
+    val content: String,
+    @SerialName("user_id")
+    val userId: String,
+    val username: String
 )
